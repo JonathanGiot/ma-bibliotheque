@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#6f4e37">
+  <title>Ma Bibliothèque</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <style>
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f7f4ef;
+      color: #29231f;
+    }
+
+    header {
+      background: #6f4e37;
+      color: white;
+      padding: 22px 18px;
+      text-align: center;
+    }
+
+    header h1 {
+      margin: 0;
+      font-size: 27px;
+    }
+
+    header p {
+      margin: 5px 0 0;
+      opacity: .85;
+      font-size: 14px;
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: auto;
+      padding: 20px;
+    }
+
+    button {
+      border: 0;
+      border-radius: 10px;
+      padding: 11px 15px;
+      cursor: pointer;
+      font-size: 15px;
+    }
+
+    .primary {
+      background: #6f4e37;
+      color: white;
+    }
+
+    .secondary {
+      background: #e8e0d8;
+      color: #44362d;
+    }
+
+    .danger {
+      background: #b84c4c;
+      color: white;
+    }
+
+    .toolbar {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 18px;
+    }
+
+    .search {
+      flex: 1;
+      min-width: 220px;
+      padding: 12px;
+      border: 1px solid #d4cbc2;
+      border-radius: 10px;
+      font-size: 16px;
+      background: white;
+    }
+
+    .filters {
+      display: flex;
+      gap: 7px;
+      overflow-x: auto;
+      margin-bottom: 22px;
+    }
+
+    .filters button {
+      white-space: nowrap;
+      background: #e8e0d8;
+    }
+
+    .filters button.active {
+      background: #6f4e37;
+      color: white;
+    }
+
+    .stats {
+      margin-bottom: 20px;
+      color: #6b625c;
+    }
+
+    .library {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(145px, 1fr));
+      gap: 22px;
+    }
+
+    .book {
+      cursor: pointer;
+      transition: transform .15s;
+    }
+
+    .book:hover {
+      transform: translateY(-3px);
+    }
+
+    .cover {
+      width: 100%;
+      aspect-ratio: 2/3;
+      object-fit: cover;
+      border-radius: 8px;
+      background: #ddd2c7;
+      box-shadow: 0 5px 15px rgba(0,0,0,.15);
+    }
+
+    .no-cover {
+      width: 100%;
+      aspect-ratio: 2/3;
+      border-radius: 8px;
+      background: #ded5cc;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 12px;
+      color: #6f6258;
+    }
+
+    .book-title {
+      font-weight: 650;
+      margin-top: 9px;
+      font-size: 14px;
+    }
+
+    .book-author {
+      color: #766c65;
+      font-size: 13px;
+      margin-top: 3px;
+    }
+
+    .status {
+      display: inline-block;
+      margin-top: 6px;
+      padding: 4px 7px;
+      border-radius: 6px;
+      background: #e8e0d8;
+      font-size: 11px;
+    }
+
+    .stars {
+      color: #b68126;
+      font-size: 13px;
+      margin-top: 4px;
+    }
+
+    .modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.55);
+      align-items: center;
+      justify-content: center;
+      padding: 15px;
+      z-index: 100;
+    }
+
+    .modal-content {
+      background: white;
+      width: 100%;
+      max-width: 520px;
+      max-height: 92vh;
+      overflow-y: auto;
+      border-radius: 16px;
+      padding: 22px;
+    }
+
+    .modal h2 {
+      margin-top: 0;
+    }
+
+    label {
+      display: block;
+      font-weight: 600;
+      margin: 14px 0 5px;
+    }
+
+    input, select, textarea {
+      width: 100%;
+      padding: 11px;
+      border: 1px solid #d3cbc5;
+      border-radius: 8px;
+      font-size: 16px;
+      font-family: inherit;
+    }
+
+    textarea {
+      min-height: 90px;
+      resize: vertical;
+    }
+
+    .modal-buttons {
+      display: flex;
+      gap: 8px;
+      margin-top: 20px;
+      flex-wrap: wrap;
+    }
+
+    #login {
+      max-width: 400px;
+      margin: 60px auto;
+      background: white;
+      padding: 25px;
+      border-radius: 15px;
+      box-shadow: 0 5px 20px rgba(0,0,0,.08);
+    }
+
+    #app {
+      display: none;
+    }
+
+    .login-message {
+      margin-top: 12px;
+      font-size: 14px;
+    }
+
+    @media (max-width: 600px) {
+      .container { padding: 15px; }
+
+      .library {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 13px;
+      }
+
+      .book-title { font-size: 12px; }
+      .book-author { font-size: 11px; }
+
+      header {
+        padding: 17px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+<header>
+  <h1>📚 Ma Bibliothèque</h1>
+  <p>Mes livres, mes lectures, mes découvertes</p>
+</header>
+
+<div id="login">
+  <h2>Connexion</h2>
+
+  <label>Email</label>
+  <input id="email" type="email">
+
+  <label>Mot de passe</label>
+  <input id="password" type="password">
+
+  <button class="primary" style="width:100%;margin-top:18px"
+          onclick="connexion()">
+    Se connecter
+  </button>
+
+  <div id="loginMessage" class="login-message"></div>
+</div>
+
+<div id="app">
+  <div class="container">
+
+    <div class="toolbar">
+      <input
+        id="search"
+        class="search"
+        placeholder="🔎 Rechercher un titre ou un auteur..."
+        oninput="afficherLivres()"
+      >
+
+      <button class="primary" onclick="nouveauLivre()">
+        ＋ Ajouter un livre
+      </button>
+
+      <button class="secondary" onclick="deconnexion()">
+        Déconnexion
+      </button>
+    </div>
+
+    <div class="filters">
+      <button class="active" onclick="filtrer('Tous',this)">Tous</button>
+      <button onclick="filtrer('À lire',this)">À lire</button>
+      <button onclick="filtrer('En cours',this)">En cours</button>
+      <button onclick="filtrer('Lu',this)">Lus</button>
+    </div>
+
+    <div id="stats" class="stats"></div>
+
+    <div id="library" class="library"></div>
+
+  </div>
+</div>
+
+<div id="modal" class="modal">
+  <div class="modal-content">
+
+    <h2 id="modalTitle">Ajouter un livre</h2>
+
+    <input id="bookId" type="hidden">
+
+    <label>Titre *</label>
+    <input id="titre">
+
+    <label>Auteur</label>
+    <input id="auteur">
+
+    <label>ISBN</label>
+    <input id="isbn">
+
+    <label>Genre</label>
+    <input id="genre">
+
+    <label>Année</label>
+    <input id="annee" type="number">
+
+    <label>URL de la couverture</label>
+    <input id="couverture" type="url">
+
+    <label>Statut</label>
+    <select id="statut">
+      <option>À lire</option>
+      <option>En cours</option>
+      <option>Lu</option>
+    </select>
+
+    <label>Note</label>
+    <select id="note">
+      <option value="">Pas encore noté</option>
+      <option value="1">⭐</option>
+      <option value="2">⭐⭐</option>
+      <option value="3">⭐⭐⭐</option>
+      <option value="4">⭐⭐⭐⭐</option>
+      <option value="5">⭐⭐⭐⭐⭐</option>
+    </select>
+
+    <label>Date de lecture</label>
+    <input id="date_lecture" type="date">
+
+    <label>Mon avis</label>
+    <textarea id="commentaire"
+              placeholder="Ce que j'ai pensé du livre..."></textarea>
+
+    <div class="modal-buttons">
+      <button class="primary" onclick="sauverLivre()">Enregistrer</button>
+      <button class="secondary" onclick="fermerModal()">Annuler</button>
+      <button id="deleteButton"
+              class="danger"
+              onclick="supprimerLivre()"
+              style="display:none">
+        Supprimer
+      </button>
+    </div>
+
+  </div>
+</div>
+
+<script>
+
+const SUPABASE_URL = "https://rycxfsqdwhwyzxniftyk.supabase.co";
+const SUPABASE_KEY = "sb_publishable_Eh5uGeqXnsL7ovYhfuq4UQ_w8qWbwGP";
+
+const client = supabase.createClient(
+  SUPABASE_URL,
+  SUPABASE_KEY
+);
+
+let livres = [];
+let filtreActuel = "Tous";
+
+async function initialiser() {
+
+  const { data } = await client.auth.getSession();
+
+  if (data.session) {
+    ouvrirApp();
+  }
+
+  client.auth.onAuthStateChange((event, session) => {
+    if (session) {
+      ouvrirApp();
+    }
+  });
+}
+
+async function connexion() {
+
+  const email = document.getElementById("email").value;
+  const password = document.getElementById("password").value;
+
+  const { error } = await client.auth.signInWithPassword({
+    email,
+    password
+  });
+
+  if (error) {
+    document.getElementById("loginMessage").textContent =
+      "Connexion impossible : " + error.message;
+  }
+}
+
+async function ouvrirApp() {
+
+  document.getElementById("login").style.display = "none";
+  document.getElementById("app").style.display = "block";
+
+  await chargerLivres();
+}
+
+async function deconnexion() {
+
+  await client.auth.signOut();
+
+  document.getElementById("app").style.display = "none";
+  document.getElementById("login").style.display = "block";
+}
+
+async function chargerLivres() {
+
+  const { data, error } = await client
+    .from("livres")
+    .select("*")
+    .order("titre");
+
+  if (error) {
+    alert("Erreur : " + error.message);
+    return;
+  }
+
+  livres = data || [];
+
+  afficherLivres();
+}
+
+function afficherLivres() {
+
+  const recherche =
+    document.getElementById("search").value.toLowerCase();
+
+  let liste = livres.filter(livre => {
+
+    const correspondRecherche =
+      (livre.titre || "").toLowerCase().includes(recherche) ||
+      (livre.auteur || "").toLowerCase().includes(recherche);
+
+    const correspondFiltre =
+      filtreActuel === "Tous" ||
+      livre.statut === filtreActuel;
+
+    return correspondRecherche && correspondFiltre;
+  });
+
+  const library = document.getElementById("library");
+
+  library.innerHTML = "";
+
+  liste.forEach(livre => {
+
+    const card = document.createElement("div");
+    card.className = "book";
+    card.onclick = () => modifierLivre(livre);
+
+    const cover = livre.couverture
+      ? `<img class="cover" src="${livre.couverture}" alt="">`
+      : `<div class="no-cover">📖<br>${livre.titre || ""}</div>`;
+
+    const stars = livre.note
+      ? "⭐".repeat(livre.note)
+      : "";
+
+    card.innerHTML = `
+      ${cover}
+      <div class="book-title">${echapper(livre.titre || "")}</div>
+      <div class="book-author">${echapper(livre.auteur || "")}</div>
+      <span class="status">${echapper(livre.statut || "À lire")}</span>
+      <div class="stars">${stars}</div>
+    `;
+
+    library.appendChild(card);
+  });
+
+  document.getElementById("stats").textContent =
+    `${liste.length} livre${liste.length > 1 ? "s" : ""}`;
+}
+
+function filtrer(statut, bouton) {
+
+  filtreActuel = statut;
+
+  document.querySelectorAll(".filters button")
+    .forEach(b => b.classList.remove("active"));
+
+  bouton.classList.add("active");
+
+  afficherLivres();
+}
+
+function nouveauLivre() {
+
+  document.getElementById("modalTitle").textContent =
+    "Ajouter un livre";
+
+  document.getElementById("bookId").value = "";
+  document.getElementById("titre").value = "";
+  document.getElementById("auteur").value = "";
+  document.getElementById("isbn").value = "";
+  document.getElementById("genre").value = "";
+  document.getElementById("annee").value = "";
+  document.getElementById("couverture").value = "";
+  document.getElementById("statut").value = "À lire";
+  document.getElementById("note").value = "";
+  document.getElementById("date_lecture").value = "";
+  document.getElementById("commentaire").value = "";
+
+  document.getElementById("deleteButton").style.display = "none";
+
+  ouvrirModal();
+}
+
+function modifierLivre(livre) {
+
+  document.getElementById("modalTitle").textContent =
+    "Modifier le livre";
+
+  document.getElementById("bookId").value = livre.id;
+  document.getElementById("titre").value = livre.titre || "";
+  document.getElementById("auteur").value = livre.auteur || "";
+  document.getElementById("isbn").value = livre.isbn || "";
+  document.getElementById("genre").value = livre.genre || "";
+  document.getElementById("annee").value = livre.annee || "";
+  document.getElementById("couverture").value = livre.couverture || "";
+  document.getElementById("statut").value = livre.statut || "À lire";
+  document.getElementById("note").value = livre.note || "";
+  document.getElementById("date_lecture").value =
+    livre.date_lecture || "";
+  document.getElementById("commentaire").value =
+    livre.commentaire || "";
+
+  document.getElementById("deleteButton").style.display =
+    "inline-block";
+
+  ouvrirModal();
+}
+
+async function sauverLivre() {
+
+  const id = document.getElementById("bookId").value;
+
+  const titre = document.getElementById("titre").value.trim();
+
+  if (!titre) {
+    alert("Indique le titre du livre.");
+    return;
+  }
+
+  const livre = {
+    titre,
+    auteur: document.getElementById("auteur").value.trim(),
+    isbn: document.getElementById("isbn").value.trim(),
+    genre: document.getElementById("genre").value.trim(),
+    annee: document.getElementById("annee").value || null,
+    couverture: document.getElementById("couverture").value.trim(),
+    statut: document.getElementById("statut").value,
+    note: document.getElementById("note").value || null,
+    date_lecture:
+      document.getElementById("date_lecture").value || null,
+    commentaire:
+      document.getElementById("commentaire").value.trim()
+  };
+
+  let resultat;
+
+  if (id) {
+
+    resultat = await client
+      .from("livres")
+      .update(livre)
+      .eq("id", id);
+
+  } else {
+
+    resultat = await client
+      .from("livres")
+      .insert(livre);
+  }
+
+  if (resultat.error) {
+    alert("Erreur : " + resultat.error.message);
+    return;
+  }
+
+  fermerModal();
+  await chargerLivres();
+}
+
+async function supprimerLivre() {
+
+  const id = document.getElementById("bookId").value;
+
+  if (!id) return;
+
+  if (!confirm("Supprimer définitivement ce livre ?")) return;
+
+  const { error } = await client
+    .from("livres")
+    .delete()
+    .eq("id", id);
+
+  if (error) {
+    alert("Erreur : " + error.message);
+    return;
+  }
+
+  fermerModal();
+  await chargerLivres();
+}
+
+function ouvrirModal() {
+  document.getElementById("modal").style.display = "flex";
+}
+
+function fermerModal() {
+  document.getElementById("modal").style.display = "none";
+}
+
+function echapper(texte) {
+
+  const div = document.createElement("div");
+
+  div.textContent = texte;
+
+  return div.innerHTML;
+}
+
+document.getElementById("modal").addEventListener(
+  "click",
+  function(event) {
+    if (event.target === this) {
+      fermerModal();
+    }
+  }
+);
+
+initialiser();
+
+</script>
+
+</body>
+</html>
