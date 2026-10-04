@@ -319,6 +319,33 @@
 
     <h2 id="modalTitle">Ajouter un livre</h2>
 
+    <div id="rechercheLivreBloc">
+  <label>🔎 Rechercher un livre</label>
+
+  <div style="display:flex; gap:8px;">
+    <input
+      id="rechercheLivre"
+      type="text"
+      placeholder="Titre, auteur ou ISBN..."
+      style="flex:1"
+    >
+
+    <button
+      type="button"
+      class="primary"
+      onclick="rechercherLivre()">
+      Rechercher
+    </button>
+  </div>
+
+  <div
+    id="resultatsRecherche"
+    style="margin-top:15px;">
+  </div>
+</div>
+
+<hr style="margin:22px 0; border:0; border-top:1px solid #ddd;">
+
     <input id="bookId" type="hidden">
 
     <label>Titre *</label>
@@ -662,6 +689,155 @@ document.getElementById("modal").addEventListener(
     }
   }
 );
+
+  async function rechercherLivre() {
+
+  const recherche =
+    document.getElementById("rechercheLivre").value.trim();
+
+  if (!recherche) {
+    alert("Indique un titre, un auteur ou un ISBN.");
+    return;
+  }
+
+  const resultats =
+    document.getElementById("resultatsRecherche");
+
+  resultats.innerHTML = "Recherche en cours…";
+
+  try {
+
+    const isbnNettoye = recherche.replace(/[-\s]/g, "");
+
+    const estISBN =
+      /^\d{10}$/.test(isbnNettoye) ||
+      /^\d{13}$/.test(isbnNettoye);
+
+    const requete = estISBN
+      ? "isbn:" + isbnNettoye
+      : recherche;
+
+    const url =
+      "https://www.googleapis.com/books/v1/volumes?q=" +
+      encodeURIComponent(requete) +
+      "&maxResults=8";
+
+    const response = await fetch(url);
+    const data = await response.json();
+
+    if (!data.items || data.items.length === 0) {
+      resultats.innerHTML =
+        "Aucun livre trouvé sur Google Books.";
+      return;
+    }
+
+    resultats.innerHTML = "";
+
+    data.items.forEach(item => {
+
+      const info = item.volumeInfo || {};
+
+      const isbn =
+        (info.industryIdentifiers || [])
+          .find(x => x.type === "ISBN_13")?.identifier ||
+        (info.industryIdentifiers || [])
+          .find(x => x.type === "ISBN_10")?.identifier ||
+        "";
+
+      const couverture =
+        info.imageLinks?.thumbnail
+          ?.replace("http://", "https://") || "";
+
+      const livre = {
+        titre: info.title || "",
+        auteur: (info.authors || []).join(", "),
+        isbn: isbn,
+        genre: (info.categories || [])[0] || "",
+        annee: info.publishedDate
+          ? parseInt(info.publishedDate.substring(0,4))
+          : "",
+        couverture: couverture
+      };
+
+      const ligne = document.createElement("div");
+
+      ligne.style.cssText = `
+        display:flex;
+        gap:12px;
+        padding:10px 0;
+        border-bottom:1px solid #ddd;
+        align-items:center;
+      `;
+
+      const image = couverture
+        ? `<img src="${couverture}"
+                style="width:55px;height:82px;
+                object-fit:cover;border-radius:4px;">`
+        : `<div style="width:55px;height:82px;
+                background:#eee;display:flex;
+                align-items:center;justify-content:center;">
+                📖
+           </div>`;
+
+      ligne.innerHTML = `
+        ${image}
+
+        <div style="flex:1">
+          <strong>${echapper(livre.titre)}</strong>
+          <div style="font-size:13px;color:#777;">
+            ${echapper(livre.auteur)}
+          </div>
+          <div style="font-size:12px;color:#999;">
+            ${livre.annee || ""}
+          </div>
+        </div>
+
+        <button class="primary">
+          Choisir
+        </button>
+      `;
+
+      ligne.querySelector("button").onclick = () =>
+        choisirLivre(livre);
+
+      resultats.appendChild(ligne);
+    });
+
+  } catch (erreur) {
+
+    console.error(erreur);
+
+    resultats.innerHTML =
+      "Impossible d'effectuer la recherche.";
+  }
+}
+
+
+function choisirLivre(livre) {
+
+  document.getElementById("titre").value =
+    livre.titre || "";
+
+  document.getElementById("auteur").value =
+    livre.auteur || "";
+
+  document.getElementById("isbn").value =
+    livre.isbn || "";
+
+  document.getElementById("genre").value =
+    livre.genre || "";
+
+  document.getElementById("annee").value =
+    livre.annee || "";
+
+  document.getElementById("couverture").value =
+    livre.couverture || "";
+
+  document.getElementById("resultatsRecherche").innerHTML =
+    "✅ Livre sélectionné : <strong>" +
+    echapper(livre.titre) +
+    "</strong>";
+}
 
 initialiser();
 
