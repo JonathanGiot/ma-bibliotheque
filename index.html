@@ -690,7 +690,7 @@ document.getElementById("modal").addEventListener(
   }
 );
 
-  async function rechercherLivre() {
+async function rechercherLivre() {
 
   const recherche =
     document.getElementById("rechercheLivre").value.trim();
@@ -703,79 +703,165 @@ document.getElementById("modal").addEventListener(
   const resultats =
     document.getElementById("resultatsRecherche");
 
-  resultats.innerHTML = "Recherche en cours…";
+  resultats.innerHTML = "🔎 Recherche en cours…";
 
   try {
 
     const isbnNettoye = recherche.replace(/[-\s]/g, "");
-
     const estISBN =
       /^\d{10}$/.test(isbnNettoye) ||
       /^\d{13}$/.test(isbnNettoye);
 
-    const requete = estISBN
-      ? "isbn:" + isbnNettoye
-      : recherche;
+    let livresTrouves = [];
 
-    const url =
-      "https://www.googleapis.com/books/v1/volumes?q=" +
-      encodeURIComponent(requete) +
-      "&maxResults=8";
+    // =========================
+    // 1. GOOGLE BOOKS
+    // =========================
 
-    const response = await fetch(url);
-    const data = await response.json();
+    try {
 
-    if (!data.items || data.items.length === 0) {
+      const requeteGoogle = estISBN
+        ? "isbn:" + isbnNettoye
+        : recherche;
+
+      const responseGoogle = await fetch(
+        "https://www.googleapis.com/books/v1/volumes?q=" +
+        encodeURIComponent(requeteGoogle) +
+        "&maxResults=10"
+      );
+
+      const dataGoogle = await responseGoogle.json();
+
+      if (dataGoogle.items) {
+
+        dataGoogle.items.forEach(item => {
+
+          const info = item.volumeInfo || {};
+
+          const isbn =
+            (info.industryIdentifiers || [])
+              .find(x => x.type === "ISBN_13")?.identifier ||
+            (info.industryIdentifiers || [])
+              .find(x => x.type === "ISBN_10")?.identifier ||
+            "";
+
+          const couverture =
+            info.imageLinks?.thumbnail
+              ?.replace("http://", "https://") || "";
+
+          livresTrouves.push({
+            titre: info.title || "",
+            auteur: (info.authors || []).join(", "),
+            isbn: isbn,
+            genre: (info.categories || [])[0] || "",
+            annee: info.publishedDate
+              ? parseInt(info.publishedDate.substring(0,4))
+              : "",
+            couverture: couverture,
+            source: "Google Books"
+          });
+
+        });
+      }
+
+    } catch (e) {
+      console.log("Google Books indisponible", e);
+    }
+
+
+    // =========================
+    // 2. OPEN LIBRARY
+    // =========================
+
+    try {
+
+      let urlOpenLibrary;
+
+      if (estISBN) {
+
+        urlOpenLibrary =
+          "https://openlibrary.org/search.json?isbn=" +
+          encodeURIComponent(isbnNettoye) +
+          "&limit=10";
+
+      } else {
+
+        urlOpenLibrary =
+          "https://openlibrary.org/search.json?q=" +
+          encodeURIComponent(recherche) +
+          "&limit=10";
+      }
+
+      const responseOL = await fetch(urlOpenLibrary);
+      const dataOL = await responseOL.json();
+
+      if (dataOL.docs) {
+
+        dataOL.docs.forEach(doc => {
+
+          const couverture = doc.cover_i
+            ? "https://covers.openlibrary.org/b/id/" +
+              doc.cover_i +
+              "-M.jpg"
+            : "";
+
+          livresTrouves.push({
+            titre: doc.title || "",
+            auteur: (doc.author_name || []).join(", "),
+            isbn: (doc.isbn || [])[0] || "",
+            genre: (doc.subject || [])[0] || "",
+            annee: doc.first_publish_year || "",
+            couverture: couverture,
+            source: "Open Library"
+          });
+
+        });
+      }
+
+    } catch (e) {
+      console.log("Open Library indisponible", e);
+    }
+
+
+    // =========================
+    // AFFICHAGE
+    // =========================
+
+    if (livresTrouves.length === 0) {
+
       resultats.innerHTML =
-        "Aucun livre trouvé sur Google Books.";
+        "Aucun livre trouvé.";
+
       return;
     }
 
     resultats.innerHTML = "";
 
-    data.items.forEach(item => {
-
-      const info = item.volumeInfo || {};
-
-      const isbn =
-        (info.industryIdentifiers || [])
-          .find(x => x.type === "ISBN_13")?.identifier ||
-        (info.industryIdentifiers || [])
-          .find(x => x.type === "ISBN_10")?.identifier ||
-        "";
-
-      const couverture =
-        info.imageLinks?.thumbnail
-          ?.replace("http://", "https://") || "";
-
-      const livre = {
-        titre: info.title || "",
-        auteur: (info.authors || []).join(", "),
-        isbn: isbn,
-        genre: (info.categories || [])[0] || "",
-        annee: info.publishedDate
-          ? parseInt(info.publishedDate.substring(0,4))
-          : "",
-        couverture: couverture
-      };
+    livresTrouves.forEach(livre => {
 
       const ligne = document.createElement("div");
 
       ligne.style.cssText = `
         display:flex;
         gap:12px;
-        padding:10px 0;
+        padding:12px 0;
         border-bottom:1px solid #ddd;
         align-items:center;
       `;
 
-      const image = couverture
-        ? `<img src="${couverture}"
-                style="width:55px;height:82px;
-                object-fit:cover;border-radius:4px;">`
-        : `<div style="width:55px;height:82px;
-                background:#eee;display:flex;
-                align-items:center;justify-content:center;">
+      const image = livre.couverture
+        ? `<img src="${livre.couverture}"
+                style="width:55px;
+                       height:82px;
+                       object-fit:cover;
+                       border-radius:4px;">`
+        : `<div style="
+                width:55px;
+                height:82px;
+                background:#eee;
+                display:flex;
+                align-items:center;
+                justify-content:center;">
                 📖
            </div>`;
 
@@ -784,11 +870,14 @@ document.getElementById("modal").addEventListener(
 
         <div style="flex:1">
           <strong>${echapper(livre.titre)}</strong>
+
           <div style="font-size:13px;color:#777;">
             ${echapper(livre.auteur)}
           </div>
+
           <div style="font-size:12px;color:#999;">
             ${livre.annee || ""}
+            · ${livre.source}
           </div>
         </div>
 
@@ -801,6 +890,7 @@ document.getElementById("modal").addEventListener(
         choisirLivre(livre);
 
       resultats.appendChild(ligne);
+
     });
 
   } catch (erreur) {
